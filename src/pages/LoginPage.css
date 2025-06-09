@@ -1,0 +1,113 @@
+/* src/pages/LoginPage.css */
+
+:root {
+  --primary: #2c7be5;
+  --background: #f5faff;
+  --input-bg: #ffffff;
+  --accent: #38b2ac;
+  --error: #e53e3e;
+  --text: #2d3748;
+  --radius: 12px;
+  --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --transition: 0.3s ease-in-out;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  background-color: var(--background);
+}
+
+.login-container {
+  background-color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-form {
+  background: var(--input-bg);
+  padding: 2.5rem 2rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-light);
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.login-form h2 {
+  text-align: center;
+  color: var(--primary);
+}
+
+.login-form input {
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid #ccc;
+  background-color: #fff;
+  transition: var(--transition);
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.login-form input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(44, 123, 229, 0.2);
+}
+
+.login-form button {
+  background-color: var(--primary);
+  color: #fff;
+  padding: 0.8rem 1rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.login-form button:hover {
+  background-color: #1b60c8;
+}
+
+.login-form p {
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.login-form a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-form a:hover {
+  text-decoration: underline;
+}
+
+.login-error {
+  color: var(--error);
+  background: #fff0f0;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
