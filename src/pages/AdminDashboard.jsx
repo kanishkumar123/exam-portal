@@ -1,51 +1,66 @@
-// inside AdminDashboard.jsx
+// src/pages/AdminDashboard.jsx
 import React, { useState } from "react";
 import { auth, db } from "../firebase";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
+import "./AdminDashboard.css"; // Import your scoped styles
 
 export default function AdminDashboard() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const createStaff = async () => {
     try {
-      // 1) Create Auth user
+      setLoading(true);
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      // 2) (Optional) set displayName in Auth profile
       await updateProfile(cred.user, { displayName: "Staff" });
-      // 3) Save role in Firestore
       await setDoc(doc(db, "users", cred.user.uid), {
         email: cred.user.email,
         role: "staff",
         createdAt: new Date(),
       });
-      alert(`Staff ${email} created!`);
+      alert(`✅ Staff account for ${email} created successfully.`);
       setEmail("");
       setPassword("");
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("❌ Error: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>Invite New Staff</h2>
-      <input
-        type="email"
-        placeholder="Staff Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <br />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <br />
-      <button onClick={createStaff}>Create Staff Account</button>
+    <div className="admin-dashboard">
+      <div className="admin-card glass-card">
+        <h2 className="admin-heading">👤 Invite New Staff</h2>
+
+        <input
+          type="email"
+          className="admin-input"
+          placeholder="Staff Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <input
+          type="password"
+          className="admin-input"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        <button
+          className="admin-button"
+          onClick={createStaff}
+          disabled={loading || !email || !password}
+        >
+          {loading ? "Creating..." : "Create Staff Account"}
+        </button>
+      </div>
     </div>
   );
 }

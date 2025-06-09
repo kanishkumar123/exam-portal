@@ -5,6 +5,7 @@ import { collection, getDocs, addDoc, doc, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import "./StudentDashboard.css";
 
 export default function StudentDashboard() {
   const { currentUser } = useAuth();
@@ -16,7 +17,6 @@ export default function StudentDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch student data
         if (currentUser) {
           const ref = doc(db, "users", currentUser.uid);
           const snap = await getDoc(ref);
@@ -25,9 +25,11 @@ export default function StudentDashboard() {
           }
         }
 
-        // Fetch exam list
         const examSnap = await getDocs(collection(db, "exams"));
-        const examsData = examSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const examsData = examSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
         setExams(examsData);
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -40,23 +42,16 @@ export default function StudentDashboard() {
   }, [currentUser]);
 
   const startExam = async (examId) => {
-    console.log("Start Exam clicked:", examId); // Add this
-    const user = auth.currentUser;
-    if (!user) {
-      console.error("User not authenticated");
-      return;
-    }
-
+    if (!auth.currentUser) return;
     try {
       await addDoc(collection(db, "registrations"), {
         examId,
-        studentId: user.uid,
+        studentId: auth.currentUser.uid,
         startedAt: new Date(),
         answers: [],
         score: null,
       });
-      console.log("Exam started");
-      navigate(`/exam/${examId}`); // ✅ Navigates to exam page
+      navigate(`/exam/${examId}`);
     } catch (err) {
       console.error("Error starting exam:", err);
     }
@@ -71,64 +66,49 @@ export default function StudentDashboard() {
     }
   };
 
-  if (loading)
-    return <div className="text-center mt-5">Loading dashboard...</div>;
-  if (!studentInfo)
-    return <div className="text-center mt-5">No student data found.</div>;
+  if (loading) return <div className="status">Loading dashboard...</div>;
+  if (!studentInfo) return <div className="status">No student data found.</div>;
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <div className="dashboard-container">
+      <header className="dashboard-header">
         <h2>Welcome, {studentInfo.name || "Student"} 👋</h2>
-        <button className="btn btn-danger" onClick={handleLogout}>
+        <button className="logout-btn" onClick={handleLogout}>
           Logout
         </button>
-      </div>
+      </header>
 
-      <div className="mb-4">
-        <h4>Your Courses</h4>
-        <ul className="list-group">
+      <section className="dashboard-section">
+        <h3>Your Courses</h3>
+        <ul className="course-list">
           {studentInfo.courses?.map((course, i) => (
-            <li
-              key={i}
-              className="list-group-item d-flex justify-content-between align-items-center"
-            >
-              {course}
-              <div className="w-100">
-                <small>{course}</small>
-                <div className="progress" style={{ height: "8px" }}>
-                  <div
-                    className="progress-bar"
-                    role="progressbar"
-                    style={{ width: `${studentInfo.progress?.[course] ?? 0}%` }}
-                    aria-valuenow={studentInfo.progress?.[course] ?? 0}
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                  ></div>
-                </div>
-                <small className="text-muted">
-                  Progress: {studentInfo.progress?.[course] ?? 0}%
-                </small>
+            <li className="course-item" key={i}>
+              <div className="course-title">{course}</div>
+              <div className="progress-bar-wrapper">
+                <div
+                  className="progress-fill"
+                  style={{
+                    width: `${studentInfo.progress?.[course] ?? 0}%`,
+                  }}
+                ></div>
               </div>
+              <small>Progress: {studentInfo.progress?.[course] ?? 0}%</small>
             </li>
           ))}
         </ul>
-      </div>
+      </section>
 
-      <div>
-        <h4>Available Exams</h4>
+      <section className="dashboard-section">
+        <h3>Available Exams</h3>
         {exams.length === 0 ? (
-          <p className="text-muted">No exams available at this time.</p>
+          <p className="empty">No exams available at this time.</p>
         ) : (
-          <ul className="list-group">
+          <ul className="exam-list">
             {exams.map((exam) => (
-              <li
-                key={exam.id}
-                className="list-group-item d-flex justify-content-between align-items-center"
-              >
-                {exam.title}
+              <li className="exam-item" key={exam.id}>
+                <span>{exam.title}</span>
                 <button
-                  className="btn btn-success btn-sm"
+                  className="start-btn"
                   onClick={() => startExam(exam.id)}
                 >
                   Start Exam
@@ -137,7 +117,7 @@ export default function StudentDashboard() {
             ))}
           </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,0 +1,138 @@
+:root {
+  --primary-color: #0a84ff;
+  --danger-color: #ff4d4f;
+  --light-bg: #f5f9ff;
+  --card-bg: #ffffff;
+  --text-color: #333;
+  --border-color: #ddd;
+  --radius: 10px;
+  --transition: all 0.3s ease;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.staff-dashboard {
+  padding: 2rem;
+  font-family: "Segoe UI", sans-serif;
+  background: var(--light-bg);
+  color: var(--text-color);
+  min-height: 100vh;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.logout-btn {
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.logout-btn:hover {
+  background: #e04343;
+}
+
+.exam-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.exam-form input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  outline: none;
+  transition: var(--transition);
+}
+
+.exam-form input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.exam-form button {
+  padding: 0.6rem 1.2rem;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.exam-form .cancel-btn {
+  background: #888;
+}
+
+.exam-form button:hover {
+  opacity: 0.9;
+}
+
+.exam-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.exam-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.exam-info {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.exam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.exam-actions button {
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius);
+  border: none;
+  background: #e6f0ff;
+  color: var(--primary-color);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.exam-actions button:hover {
+  background: #d0e6ff;
+}
+
+.question-section,
+.results-section {
+  background: #fafafa;
+  padding: 1rem;
+  border-left: 4px solid var(--primary-color);
+  margin-top: 0.75rem;
+  border-radius: var(--radius);
+}

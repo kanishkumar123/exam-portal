@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { createUserProfile, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import "./SignupPage.css"; // ✅ plain CSS import
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -21,20 +22,24 @@ export default function SignupPage() {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      {error && <p>{error}</p>}
-      <input
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email"
-      />
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-      />
-      <button type="submit">Sign Up</button>
-    </form>
+    <div className="signup-container">
+      <form onSubmit={handleSubmit} className="signup-form">
+        <h2>Create Student Account</h2>
+        {error && <p className="signup-error">{error}</p>}
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+        />
+        <button type="submit">Sign Up</button>
+      </form>
+    </div>
   );
 }

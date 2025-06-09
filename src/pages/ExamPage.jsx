@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import "./ExamPage.css";
 
 export default function ExamPage() {
   const { examId } = useParams();
@@ -117,35 +118,33 @@ export default function ExamPage() {
   };
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
+    <div className="container">
+      <div className="exam-header">
         <h2>Exam</h2>
         <h4 className="text-danger">Time Left: {formatTime(timeLeft)}</h4>
       </div>
 
       {questions.map((q, index) => (
-        <div key={q.id} className="mb-4">
+        <div key={q.id} className="question-block">
           <h5>
             {index + 1}. {q.question}
           </h5>
           {q.options.map((opt, i) => (
-            <div key={i}>
-              <label>
-                <input
-                  type="radio"
-                  name={q.id}
-                  value={i}
-                  checked={answers[q.id] === i}
-                  onChange={() => handleOptionChange(q.id, i)}
-                />{" "}
-                {opt}
-              </label>
-            </div>
+            <label key={i}>
+              <input
+                type="radio"
+                name={q.id}
+                value={i}
+                checked={answers[q.id] === i}
+                onChange={() => handleOptionChange(q.id, i)}
+              />
+              {opt}
+            </label>
           ))}
         </div>
       ))}
 
-      <button className="btn btn-primary mt-3" onClick={handleSubmit}>
+      <button className="btn" onClick={handleSubmit}>
         Submit Exam
       </button>
     </div>
