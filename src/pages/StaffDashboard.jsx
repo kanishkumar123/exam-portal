@@ -16,14 +16,26 @@ import { useNavigate } from "react-router-dom";
 
 export default function StaffDashboard() {
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [duration, setDuration] = useState("");
+  const [startDateTime, setStartDateTime] = useState("");
+  const [endDateTime, setEndDateTime] = useState("");
+  const [duration, setDuration] = useState(0);
   const [exams, setExams] = useState([]);
   const [editingExam, setEditingExam] = useState(null);
   const [showQFor, setShowQFor] = useState(null);
   const [resultsForExam, setResultsForExam] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const navigate = useNavigate();
+
+  // Helper to format Firestore Timestamp or JS Date or ISO string
+  const formatDateTime = (ts) => {
+    if (!ts) return "";
+    if (ts.seconds !== undefined) {
+      return new Date(ts.seconds * 1000).toLocaleString();
+    }
+    // If it's a JS Date object or ISO string
+    const dateObj = ts instanceof Date ? ts : new Date(ts);
+    return dateObj.toLocaleString();
+  };
 
   // Fetch exams
   const fetchExams = async () => {
@@ -35,10 +47,16 @@ export default function StaffDashboard() {
     fetchExams();
   }, []);
 
-  // Create or update exam
+  // Create or update exam with schedule
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { title, date, duration: +duration };
+    const payload = {
+      title,
+      startTime: new Date(startDateTime),
+      endTime: new Date(endDateTime),
+      duration: Number(duration),
+      createdBy: auth.currentUser.uid,
+    };
     if (editingExam) {
       await updateDoc(doc(db, "exams", editingExam.id), payload);
       setEditingExam(null);
@@ -46,8 +64,9 @@ export default function StaffDashboard() {
       await addDoc(collection(db, "exams"), payload);
     }
     setTitle("");
-    setDate("");
-    setDuration("");
+    setStartDateTime("");
+    setEndDateTime("");
+    setDuration(0);
     fetchExams();
   };
 
@@ -61,72 +80,98 @@ export default function StaffDashboard() {
   // Edit exam
   const handleEdit = (exam) => {
     setEditingExam(exam);
+    const toLocal = (ts) => {
+      if (!ts) return "";
+      const dateObj =
+        ts.seconds !== undefined ? new Date(ts.seconds * 1000) : new Date(ts);
+      return dateObj.toISOString().slice(0, 16);
+    };
     setTitle(exam.title);
-    setDate(exam.date);
+    setStartDateTime(toLocal(exam.startTime));
+    setEndDateTime(toLocal(exam.endTime));
     setDuration(exam.duration);
   };
 
   // Logout
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate("/login");
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
+    await signOut(auth);
+    navigate("/login");
   };
 
   // Fetch registrations for an exam
   const fetchResults = async (examId) => {
     const regSnap = await getDocs(collection(db, "registrations"));
     const filtered = regSnap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .map((d) => ({ id: d.id, ...d.data() }))
       .filter((r) => r.examId === examId);
     setRegistrations(filtered);
     setResultsForExam(examId);
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>📝 {editingExam ? "Edit Exam" : "Create New Exam"}</h2>
-      <button className="btn btn-danger" onClick={handleLogout}>
-        Logout
-      </button>
+    <div className="container py-4">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2>📝 {editingExam ? "Edit Exam" : "Create New Exam"}</h2>
+        <button className="btn btn-danger" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
-        <input
-          type="text"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-        />
-        <input
-          type="number"
-          placeholder="Duration (mins)"
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-          required
-        />
-        <button type="submit">
+      <form onSubmit={handleSubmit} className="mb-4">
+        <div className="mb-2">
+          <input
+            className="form-control"
+            type="text"
+            placeholder="Exam Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-2">
+          <label>Start Date & Time:</label>
+          <input
+            className="form-control"
+            type="datetime-local"
+            value={startDateTime}
+            onChange={(e) => setStartDateTime(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-2">
+          <label>End Date & Time:</label>
+          <input
+            className="form-control"
+            type="datetime-local"
+            value={endDateTime}
+            onChange={(e) => setEndDateTime(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-2">
+          <input
+            className="form-control"
+            type="number"
+            placeholder="Duration (mins)"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            required
+          />
+        </div>
+        <button className="btn btn-primary me-2" type="submit">
           {editingExam ? "Update Exam" : "Create Exam"}
         </button>
         {editingExam && (
           <button
             type="button"
+            className="btn btn-secondary"
             onClick={() => {
               setEditingExam(null);
               setTitle("");
-              setDate("");
-              setDuration("");
+              setStartDateTime("");
+              setEndDateTime("");
+              setDuration(0);
             }}
-            style={{ marginLeft: 8 }}
           >
             Cancel
           </button>
@@ -134,67 +179,90 @@ export default function StaffDashboard() {
       </form>
 
       <h3>📚 All Exams</h3>
-      <ul>
-        {exams.map((exam) => (
-          <li key={exam.id} style={{ marginBottom: 12 }}>
-            <strong>{exam.title}</strong> ({exam.date}) — {exam.duration} mins
-            <button onClick={() => handleEdit(exam)} style={{ marginLeft: 8 }}>
-              Edit
-            </button>
-            <button
-              onClick={() => handleDelete(exam.id)}
-              style={{ marginLeft: 8 }}
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => setShowQFor(showQFor === exam.id ? null : exam.id)}
-              style={{ marginLeft: 8 }}
-            >
-              {showQFor === exam.id ? "Hide Questions" : "Manage Questions"}
-            </button>
-            <button
-              onClick={() =>
-                resultsForExam === exam.id
-                  ? setResultsForExam(null)
-                  : fetchResults(exam.id)
-              }
-              style={{ marginLeft: 8 }}
-            >
-              {resultsForExam === exam.id
-                ? "Hide Submissions"
-                : "View Submissions"}
-            </button>
-            {/* Questions UI */}
-            {showQFor === exam.id && (
-              <div style={{ marginTop: 8 }}>
-                <QuestionForm examId={exam.id} onQuestionAdded={() => {}} />
-                <QuestionList examId={exam.id} />
+      {exams.length === 0 ? (
+        <p>No exams scheduled.</p>
+      ) : (
+        <ul className="list-group">
+          {exams.map((exam) => (
+            <li key={exam.id} className="list-group-item mb-3">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <strong>{exam.title}</strong>
+                  <div>Starts: {formatDateTime(exam.startTime)}</div>
+                  <div>Ends: {formatDateTime(exam.endTime)}</div>
+                  <div>Duration: {exam.duration} mins</div>
+                </div>
+                <div className="btn-group">
+                  <button
+                    onClick={() => handleEdit(exam)}
+                    className="btn btn-sm btn-outline-primary"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(exam.id)}
+                    className="btn btn-sm btn-outline-danger"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() =>
+                      setShowQFor(showQFor === exam.id ? null : exam.id)
+                    }
+                    className="btn btn-sm btn-outline-secondary"
+                  >
+                    {showQFor === exam.id ? "Hide Qs" : "Manage Qs"}
+                  </button>
+                  <button
+                    onClick={() => fetchResults(exam.id)}
+                    className="btn btn-sm btn-outline-info"
+                  >
+                    View Submissions
+                  </button>
+                </div>
               </div>
-            )}
-            {/* Submissions UI */}
-            {resultsForExam === exam.id && (
-              <div style={{ marginTop: 12, marginLeft: 20 }}>
-                <h5>📊 Submissions:</h5>
-                {registrations.length === 0 ? (
-                  <p>No students have submitted this exam yet.</p>
-                ) : (
-                  <ul>
-                    {registrations.map((reg) => (
-                      <li key={reg.id}>
-                        Student ID: <strong>{reg.studentId}</strong> — Score:{" "}
-                        <strong>
-                          {reg.score !== null ? reg.score : "Not graded yet"}
-                        </strong>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+              {showQFor === exam.id && (
+                <div className="mt-3">
+                  <QuestionForm examId={exam.id} onQuestionAdded={fetchExams} />
+                  <QuestionList examId={exam.id} />
+                </div>
+              )}
+              {resultsForExam === exam.id && (
+                <div className="mt-3 ps-3">
+                  <h5>Submissions:</h5>
+                  {registrations.length === 0 ? (
+                    <p>No submissions yet.</p>
+                  ) : (
+                    <ul>
+                      {registrations.map((reg) => (
+                        <li key={reg.id} className="mb-2">
+                          <div>
+                            <strong>Student:</strong> {reg.studentId}
+                          </div>
+                          <div>
+                            <strong>Started:</strong>{" "}
+                            {formatDateTime(reg.startedAt)}
+                          </div>
+                          <div>
+                            <strong>Submitted:</strong>{" "}
+                            {reg.submittedAt
+                              ? formatDateTime(reg.submittedAt)
+                              : "In progress"}
+                          </div>
+                          <div>
+                            <strong>Score:</strong>{" "}
+                            {reg.score !== null ? reg.score : "Not graded"}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

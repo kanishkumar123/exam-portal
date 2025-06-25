@@ -26,6 +26,7 @@ export default function ExamPage() {
       try {
         // Get exam metadata including duration
         const examDoc = await getDoc(doc(db, "exams", examId));
+
         if (examDoc.exists()) {
           const data = examDoc.data();
 

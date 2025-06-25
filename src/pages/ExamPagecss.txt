@@ -1,0 +1,120 @@
+:root {
+  --primary-color: #007bff;
+  --accent-color: #ff4c4c;
+  --bg-color: #f5f9ff;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --border-color: #e0e0e0;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --font-main: "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background: var(--bg-color);
+  font-family: var(--font-main);
+}
+
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
+}
+
+h2 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #222;
+}
+
+h4.text-danger {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--accent-color);
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.question-block {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid var(--primary-color);
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.question-block h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.75rem;
+}
+
+.question-block label {
+  display: flex;
+  align-items: center;
+  margin: 0.3rem 0;
+  padding: 0.4rem 0.6rem;
+  background: #f1f7ff;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.question-block input[type="radio"] {
+  margin-right: 10px;
+  accent-color: var(--primary-color);
+}
+
+.question-block label:hover {
+  background-color: #dceeff;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease;
+}
+
+.btn:hover {
+  background: #0056c7;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+@media screen and (max-width: 768px) {
+  .container {
+    padding: 1rem;
+    margin: 1rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  h4.text-danger {
+    font-size: 1rem;
+  }
+}

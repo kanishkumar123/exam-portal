@@ -14,16 +14,23 @@ import {
   updateProfile,
   signOut,
 } from "firebase/auth";
+import Papa from "papaparse";
 import { useNavigate } from "react-router-dom";
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Bulk import state
+  const [file, setFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importLog, setImportLog] = useState([]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  // Fetch all users
+  // Fetch all users from Firestore
   const fetchUsers = async () => {
     setLoading(true);
     const snap = await getDocs(collection(db, "users"));
@@ -42,14 +49,14 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
-  // Delete user
+  // Delete Firestore user record
   const handleDelete = async (uid) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    if (!window.confirm("Delete this user record?")) return;
     await deleteDoc(doc(db, "users", uid));
     fetchUsers();
   };
 
-  // Invite new staff
+  // Invite New Staff
   const createStaff = async () => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -66,6 +73,63 @@ export default function AdminDashboard() {
     } catch (err) {
       alert("Error: " + err.message);
     }
+  };
+
+  // Bulk Import Students from CSV (DD-MM-YYYY)
+  const handleImport = () => {
+    if (!file) return;
+    setImporting(true);
+    setImportLog([]);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const log = [];
+        for (let row of results.data) {
+          const appNum = String(
+            row.applicationNumber || row.application_number
+          ).trim();
+          const dobRaw = String(row.DOB || row.dob).trim();
+
+          // Parse DD-MM-YYYY or DD/MM/YYYY
+          const parts = dobRaw.split(/[-/]/);
+          if (parts.length !== 3) {
+            log.push(`❌ ${appNum}: invalid DOB format "${dobRaw}"`);
+            continue;
+          }
+          let [day, month, year] = parts;
+          day = day.padStart(2, "0");
+          month = month.padStart(2, "0");
+          // Build ISO date and password
+          const isoDate = `${year}-${month}-${day}`; // YYYY-MM-DD
+          const pwd = `${year}${month}${day}`; // YYYYMMDD
+
+          const email = `${appNum}@yourdomain.local`;
+          try {
+            const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+            await setDoc(doc(db, "users", cred.user.uid), {
+              uid: cred.user.uid,
+              role: "student",
+              applicationNumber: appNum,
+              dob: isoDate,
+              createdAt: new Date(),
+            });
+            log.push(`✅ ${appNum}`);
+          } catch (err) {
+            log.push(`❌ ${appNum}: ${err.code}`);
+          }
+        }
+        setImportLog(log);
+        setImporting(false);
+        fetchUsers();
+      },
+      error: (err) => {
+        console.error("CSV parse error:", err);
+        setImportLog([`❌ CSV parse error: ${err.message}`]);
+        setImporting(false);
+      },
+    });
   };
 
   // Logout
@@ -107,6 +171,33 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Bulk Import Students */}
+      <div className="mb-5">
+        <h4>Import Students from CSV</h4>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => setFile(e.target.files[0])}
+        />
+        <button
+          className="btn btn-secondary ms-2"
+          onClick={handleImport}
+          disabled={!file || importing}
+        >
+          {importing ? "Importing..." : "Start Import"}
+        </button>
+        {importLog.length > 0 && (
+          <div className="mt-3">
+            <h6>Import Results:</h6>
+            <ul>
+              {importLog.map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
       {/* User Management Table */}
       {loading ? (
         <p>Loading users...</p>
@@ -116,7 +207,7 @@ export default function AdminDashboard() {
             <tr>
               <th>UID</th>
               <th>Email</th>
-              <th>Name</th>
+              <th>Name/App#</th>
               <th>Role</th>
               <th>Actions</th>
             </tr>
@@ -126,7 +217,7 @@ export default function AdminDashboard() {
               <tr key={u.uid}>
                 <td>{u.uid}</td>
                 <td>{u.email}</td>
-                <td>{u.displayName || u.name || "—"}</td>
+                <td>{u.applicationNumber || u.displayName || "—"}</td>
                 <td>
                   <select
                     className="form-select"
