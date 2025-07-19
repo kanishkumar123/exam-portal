@@ -11,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import "./Exampage.css";
 
 export default function ExamPage() {
   const { examId } = useParams();
@@ -83,15 +84,33 @@ export default function ExamPage() {
         }
       });
 
-      // Find the student's registration doc
-      const regSnap = await getDocs(
+      let regDoc = null;
+
+      // 1st try: search by studentId field (best if registration has it)
+      const regSnapByID = await getDocs(
         query(
           collection(db, "registrations"),
           where("examId", "==", examId),
           where("studentId", "==", user.uid)
         )
       );
-      const regDoc = regSnap.docs[0];
+      if (!regSnapByID.empty) {
+        regDoc = regSnapByID.docs[0];
+      } else {
+        // 2nd fallback: search by studentAppNo using email prefix
+        const emailPrefix = user.email.split("@")[0];
+        const regSnapByApp = await getDocs(
+          query(
+            collection(db, "registrations"),
+            where("examId", "==", examId),
+            where("studentAppNo", "==", emailPrefix)
+          )
+        );
+        if (!regSnapByApp.empty) {
+          regDoc = regSnapByApp.docs[0];
+        }
+      }
+
       if (!regDoc) throw new Error("Registration not found");
 
       // Update registration with answers and score

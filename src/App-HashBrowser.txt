@@ -1,18 +1,17 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import StudentDashboard from "./pages/StudentDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ExamPage from "./pages/ExamPage";
-import ManageQuestionsPage from "./pages/ManageQuestionsPage"; // ✅ import new page
 
 import RedirectByRole from "./components/RedirectByRole";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         {/* Landing route redirects based on role */}
         <Route path="/" element={<RedirectByRole />} />
@@ -30,10 +29,6 @@ export default function App() {
         {/* Protected Staff routes */}
         <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
           <Route path="/staff" element={<StaffDashboard />} />
-          <Route
-            path="/staff/exam/:examId/questions"
-            element={<ManageQuestionsPage />}
-          />
         </Route>
 
         {/* Protected Admin routes */}
@@ -44,6 +39,6 @@ export default function App() {
         {/* Catch-all fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

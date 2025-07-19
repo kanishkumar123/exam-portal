@@ -1,4 +1,3 @@
-// src/pages/StaffDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
 import {
@@ -8,261 +7,284 @@ import {
   deleteDoc,
   updateDoc,
   doc,
+  query,
+  where,
+  setDoc,
 } from "firebase/firestore";
-import QuestionForm from "../components/QuestionForm";
-import QuestionList from "../components/QuestionList";
-import { signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import Papa from "papaparse";
+import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import "./StaffDashboard.css"; // ✅ Import your custom styles
 
 export default function StaffDashboard() {
-  const [title, setTitle] = useState("");
-  const [startDateTime, setStartDateTime] = useState("");
-  const [endDateTime, setEndDateTime] = useState("");
-  const [duration, setDuration] = useState(0);
+  const { currentUser, logout } = useAuth();
   const [exams, setExams] = useState([]);
-  const [editingExam, setEditingExam] = useState(null);
-  const [showQFor, setShowQFor] = useState(null);
-  const [resultsForExam, setResultsForExam] = useState(null);
-  const [registrations, setRegistrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [csvTarget, setCsvTarget] = useState(null); // current examId being imported
+  const [csvLogs, setCsvLogs] = useState({});
+  const [csvImporting, setCsvImporting] = useState(false);
+
   const navigate = useNavigate();
 
-  // Helper to format Firestore Timestamp or JS Date or ISO string
-  const formatDateTime = (ts) => {
-    if (!ts) return "";
-    if (ts.seconds !== undefined) {
-      return new Date(ts.seconds * 1000).toLocaleString();
-    }
-    // If it's a JS Date object or ISO string
-    const dateObj = ts instanceof Date ? ts : new Date(ts);
-    return dateObj.toLocaleString();
-  };
-
-  // Fetch exams
-  const fetchExams = async () => {
-    const snap = await getDocs(collection(db, "exams"));
-    setExams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  };
-
+  // Fetch exams created by current staff
   useEffect(() => {
+    if (!currentUser) {
+      navigate("/login");
+      return;
+    }
+    const fetchExams = async () => {
+      setLoading(true);
+      const q = query(
+        collection(db, "exams"),
+        where("createdBy", "==", currentUser.uid)
+      );
+      const snap = await getDocs(q);
+      setExams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    };
     fetchExams();
-  }, []);
+  }, [currentUser, navigate]);
 
-  // Create or update exam with schedule
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { title, startTime, endTime, duration } = e.target.elements;
     const payload = {
-      title,
-      startTime: new Date(startDateTime),
-      endTime: new Date(endDateTime),
-      duration: Number(duration),
-      createdBy: auth.currentUser.uid,
+      title: title.value,
+      startTime: new Date(startTime.value),
+      endTime: new Date(endTime.value),
+      duration: Number(duration.value),
+      createdBy: currentUser.uid,
     };
-    if (editingExam) {
-      await updateDoc(doc(db, "exams", editingExam.id), payload);
-      setEditingExam(null);
+    const form = e.target;
+    if (form.dataset.editId) {
+      await updateDoc(doc(db, "exams", form.dataset.editId), payload);
+      delete form.dataset.editId;
     } else {
       await addDoc(collection(db, "exams"), payload);
     }
-    setTitle("");
-    setStartDateTime("");
-    setEndDateTime("");
-    setDuration(0);
-    fetchExams();
+    form.reset();
+
+    setLoading(true);
+    const q = query(
+      collection(db, "exams"),
+      where("createdBy", "==", currentUser.uid)
+    );
+    const snap = await getDocs(q);
+    setExams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    setLoading(false);
   };
 
-  // Delete exam
   const handleDelete = async (id) => {
     await deleteDoc(doc(db, "exams", id));
-    if (showQFor === id) setShowQFor(null);
-    fetchExams();
+    setExams((prev) => prev.filter((e) => e.id !== id));
   };
 
-  // Edit exam
-  const handleEdit = (exam) => {
-    setEditingExam(exam);
-    const toLocal = (ts) => {
-      if (!ts) return "";
-      const dateObj =
-        ts.seconds !== undefined ? new Date(ts.seconds * 1000) : new Date(ts);
-      return dateObj.toISOString().slice(0, 16);
-    };
-    setTitle(exam.title);
-    setStartDateTime(toLocal(exam.startTime));
-    setEndDateTime(toLocal(exam.endTime));
-    setDuration(exam.duration);
+  const handleStudentCsv = (file, examId) => {
+    if (!file) return;
+    setCsvImporting(true);
+    setCsvLogs((l) => ({ ...l, [examId]: [] }));
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async ({ data }) => {
+        const logs = [];
+        for (const row of data) {
+          const app = String(row.applicationNumber).trim();
+          const dobRaw = String(row.DOB).trim();
+
+          if (!app || !dobRaw) {
+            logs.push(`❌ [${app}] Missing applicationNumber or DOB`);
+            continue;
+          }
+
+          const parts = dobRaw.split(/[-/]/);
+          if (parts.length !== 3) {
+            logs.push(`❌ [${app}] Invalid DOB "${dobRaw}"`);
+            continue;
+          }
+
+          let [day, month, year] = parts.map((p) => p.padStart(2, "0"));
+          const iso = `${year}-${month}-${day}`;
+          const pwd = `${year}${month}${day}`;
+          const studEmail = `${app}@yourdomain.local`;
+
+          let uid = null;
+          try {
+            const usersSnap = await getDocs(
+              query(
+                collection(db, "users"),
+                where("applicationNumber", "==", app)
+              )
+            );
+
+            if (!usersSnap.empty) {
+              uid = usersSnap.docs[0].id;
+              logs.push(`ℹ️ [${app}] Student exists`);
+            } else {
+              try {
+                const cred = await createUserWithEmailAndPassword(
+                  auth,
+                  studEmail,
+                  pwd
+                );
+                uid = cred.user.uid;
+                await setDoc(doc(db, "users", uid), {
+                  uid,
+                  email: studEmail,
+                  role: "student",
+                  applicationNumber: app,
+                  dob: iso,
+                  createdAt: new Date(),
+                });
+                logs.push(`✅ [${app}] Student created`);
+              } catch (createErr) {
+                logs.push(
+                  `❌ [${app}] User create error: ${
+                    createErr.message || createErr.code
+                  }`
+                );
+                continue;
+              }
+            }
+
+            const regRef = doc(db, "registrations", `${examId}_${app}`);
+            await setDoc(regRef, {
+              examId,
+              studentId: uid,
+              studentAppNo: app,
+              DOB: dobRaw,
+              allowed: true,
+            });
+
+            logs.push(`✅ [${app}] Registered for exam`);
+          } catch (err) {
+            logs.push(`❌ [${app}] Error: ${err.message || err.code}`);
+          }
+        }
+
+        setCsvLogs((prev) => ({
+          ...prev,
+          [examId]: logs,
+        }));
+        setCsvImporting(false);
+        setCsvTarget(null);
+        alert("CSV import completed.");
+      },
+    });
   };
 
-  // Logout
   const handleLogout = async () => {
-    await signOut(auth);
+    await logout();
     navigate("/login");
   };
 
-  // Fetch registrations for an exam
-  const fetchResults = async (examId) => {
-    const regSnap = await getDocs(collection(db, "registrations"));
-    const filtered = regSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((r) => r.examId === examId);
-    setRegistrations(filtered);
-    setResultsForExam(examId);
-  };
+  if (loading) return <div>Loading…</div>;
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2>📝 {editingExam ? "Edit Exam" : "Create New Exam"}</h2>
-        <button className="btn btn-danger" onClick={handleLogout}>
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2>Your Exams</h2>
+        <button className="logout-btn" onClick={handleLogout}>
           Logout
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="mb-4">
-        <div className="mb-2">
-          <input
-            className="form-control"
-            type="text"
-            placeholder="Exam Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </div>
-        <div className="mb-2">
-          <label>Start Date & Time:</label>
-          <input
-            className="form-control"
-            type="datetime-local"
-            value={startDateTime}
-            onChange={(e) => setStartDateTime(e.target.value)}
-            required
-          />
-        </div>
-        <div className="mb-2">
-          <label>End Date & Time:</label>
-          <input
-            className="form-control"
-            type="datetime-local"
-            value={endDateTime}
-            onChange={(e) => setEndDateTime(e.target.value)}
-            required
-          />
-        </div>
-        <div className="mb-2">
-          <input
-            className="form-control"
-            type="number"
-            placeholder="Duration (mins)"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            required
-          />
-        </div>
-        <button className="btn btn-primary me-2" type="submit">
-          {editingExam ? "Update Exam" : "Create Exam"}
-        </button>
-        {editingExam && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => {
-              setEditingExam(null);
-              setTitle("");
-              setStartDateTime("");
-              setEndDateTime("");
-              setDuration(0);
-            }}
-          >
-            Cancel
-          </button>
-        )}
+      {/* Exam form */}
+      <form className="exam-form" onSubmit={handleSubmit}>
+        <input name="title" placeholder="Title" required />
+        <input name="startTime" type="datetime-local" required />
+        <input name="endTime" type="datetime-local" required />
+        <input
+          name="duration"
+          type="number"
+          placeholder="Duration (mins)"
+          required
+        />
+        <button type="submit">Save Exam</button>
       </form>
 
-      <h3>📚 All Exams</h3>
-      {exams.length === 0 ? (
-        <p>No exams scheduled.</p>
-      ) : (
-        <ul className="list-group">
-          {exams.map((exam) => (
-            <li key={exam.id} className="list-group-item mb-3">
-              <div className="d-flex justify-content-between">
-                <div>
-                  <strong>{exam.title}</strong>
-                  <div>Starts: {formatDateTime(exam.startTime)}</div>
-                  <div>Ends: {formatDateTime(exam.endTime)}</div>
-                  <div>Duration: {exam.duration} mins</div>
-                </div>
-                <div className="btn-group">
-                  <button
-                    onClick={() => handleEdit(exam)}
-                    className="btn btn-sm btn-outline-primary"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(exam.id)}
-                    className="btn btn-sm btn-outline-danger"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() =>
-                      setShowQFor(showQFor === exam.id ? null : exam.id)
-                    }
-                    className="btn btn-sm btn-outline-secondary"
-                  >
-                    {showQFor === exam.id ? "Hide Qs" : "Manage Qs"}
-                  </button>
-                  <button
-                    onClick={() => fetchResults(exam.id)}
-                    className="btn btn-sm btn-outline-info"
-                  >
-                    View Submissions
-                  </button>
-                </div>
-              </div>
-              {showQFor === exam.id && (
-                <div className="mt-3">
-                  <QuestionForm examId={exam.id} onQuestionAdded={fetchExams} />
-                  <QuestionList examId={exam.id} />
-                </div>
-              )}
-              {resultsForExam === exam.id && (
-                <div className="mt-3 ps-3">
-                  <h5>Submissions:</h5>
-                  {registrations.length === 0 ? (
-                    <p>No submissions yet.</p>
-                  ) : (
-                    <ul>
-                      {registrations.map((reg) => (
-                        <li key={reg.id} className="mb-2">
-                          <div>
-                            <strong>Student:</strong> {reg.studentId}
-                          </div>
-                          <div>
-                            <strong>Started:</strong>{" "}
-                            {formatDateTime(reg.startedAt)}
-                          </div>
-                          <div>
-                            <strong>Submitted:</strong>{" "}
-                            {reg.submittedAt
-                              ? formatDateTime(reg.submittedAt)
-                              : "In progress"}
-                          </div>
-                          <div>
-                            <strong>Score:</strong>{" "}
-                            {reg.score !== null ? reg.score : "Not graded"}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      {exams.length === 0 && <p>No exams created yet.</p>}
+
+      {exams.map((exam) => (
+        <div key={exam.id} className="exam-card">
+          <h4>{exam.title}</h4>
+          <p>
+            {new Date(
+              exam.startTime.seconds
+                ? exam.startTime.seconds * 1000
+                : exam.startTime
+            ).toLocaleString()}{" "}
+            –{" "}
+            {new Date(
+              exam.endTime.seconds ? exam.endTime.seconds * 1000 : exam.endTime
+            ).toLocaleString()}
+          </p>
+          <p>Duration: {exam.duration} mins</p>
+
+          <div className="exam-buttons">
+            <button
+              onClick={() => {
+                const f = document.querySelector("form");
+                f.title.value = exam.title;
+
+                let st = exam.startTime.seconds
+                  ? new Date(exam.startTime.seconds * 1000)
+                  : new Date(exam.startTime);
+                let et = exam.endTime.seconds
+                  ? new Date(exam.endTime.seconds * 1000)
+                  : new Date(exam.endTime);
+
+                f.startTime.value = st.toISOString().slice(0, 16);
+                f.endTime.value = et.toISOString().slice(0, 16);
+                f.duration.value = exam.duration;
+                f.dataset.editId = exam.id;
+              }}
+            >
+              Edit
+            </button>
+            <button onClick={() => handleDelete(exam.id)}>Delete</button>
+            <button
+              onClick={() =>
+                setCsvTarget(csvTarget === exam.id ? null : exam.id)
+              }
+              disabled={csvImporting}
+            >
+              {csvTarget === exam.id ? "Cancel CSV" : "Import Students"}
+            </button>
+            <button onClick={() => navigate(`/staff/results/${exam.id}`)}>
+              View Submissions
+            </button>
+            <button
+              onClick={() => navigate(`/staff/exam/${exam.id}/questions`)}
+            >
+              Manage Questions
+            </button>
+          </div>
+
+          {/* 📥 CSV File input */}
+          {csvTarget === exam.id && (
+            <div>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => handleStudentCsv(e.target.files[0], exam.id)}
+              />
+              {csvImporting && <span>Importing…</span>}
+            </div>
+          )}
+
+          {/* 📜 CSV Import logs */}
+          {csvLogs[exam.id] && csvLogs[exam.id].length > 0 && (
+            <ul className="logs">
+              {csvLogs[exam.id].map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

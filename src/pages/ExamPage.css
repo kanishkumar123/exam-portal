@@ -1,91 +1,120 @@
-/* ExamPage.css */
+:root {
+  --primary-color: #007bff;
+  --accent-color: #ff4c4c;
+  --bg-color: #f5f9ff;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --border-color: #e0e0e0;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --font-main: "Segoe UI", Roboto, sans-serif;
+}
 
-/* Container */
-.exam-container {
+body {
+  background: var(--bg-color);
+  font-family: var(--font-main);
+}
+
+.container {
   max-width: 800px;
   margin: 2rem auto;
-  padding: 1rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  color: #333;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
 }
 
-/* Loading state */
-.exam-loading {
-  text-align: center;
-  padding: 4rem 0;
-  font-size: 1.25rem;
-  color: #666;
-}
-
-/* Header */
-.exam-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-}
-.exam-header h1 {
-  font-size: 1.75rem;
-  margin: 0;
-}
-.timer {
-  font-size: 1.5rem;
+h2 {
+  font-size: 1.8rem;
   font-weight: 600;
+  color: #222;
 }
 
-/* Question card */
-.question-card {
-  background: #f9f9f9;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-.question-text {
-  margin-bottom: 0.75rem;
+h4.text-danger {
+  font-size: 1.2rem;
   font-weight: 500;
+  color: var(--accent-color);
+  animation: pulse 1s infinite alternate;
 }
 
-/* Options list */
-.options-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+@keyframes pulse {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-/* Option button */
-.option-btn {
+.question-block {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid var(--primary-color);
   background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 0.65rem 1rem;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-.option-btn:hover {
-  background: #f0f0f0;
-}
-.option-btn.selected {
-  background: #e0f7fa;
-  border-color: #26c6da;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
 }
 
-/* Submit button */
-.submit-btn {
-  display: block;
-  margin: 2rem auto 0;
-  padding: 0.75rem 1.5rem;
+.question-block h5 {
   font-size: 1rem;
-  background: #26a69a;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.75rem;
 }
-.submit-btn:hover {
-  background: #1e8e84;
+
+.question-block label {
+  display: flex;
+  align-items: center;
+  margin: 0.3rem 0;
+  padding: 0.4rem 0.6rem;
+  background: #f1f7ff;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.question-block input[type="radio"] {
+  margin-right: 10px;
+  accent-color: var(--primary-color);
+}
+
+.question-block label:hover {
+  background-color: #dceeff;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease;
+}
+
+.btn:hover {
+  background: #0056c7;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+@media screen and (max-width: 768px) {
+  .container {
+    padding: 1rem;
+    margin: 1rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  h4.text-danger {
+    font-size: 1rem;
+  }
 }

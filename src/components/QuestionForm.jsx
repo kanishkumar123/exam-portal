@@ -1,3 +1,4 @@
+// src/components/QuestionForm.jsx
 import React, { useState } from "react";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "../firebase";
@@ -7,54 +8,57 @@ export default function QuestionForm({ examId, onQuestionAdded }) {
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
 
-  const handleOptionChange = (value, index) => {
-    const newOptions = [...options];
-    newOptions[index] = value;
-    setOptions(newOptions);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await addDoc(collection(db, "exams", examId, "questions"), {
+    await addDoc(collection(db, `exams/${examId}/questions`), {
       question,
       options,
       correctIndex,
+      createdAt: new Date(),
     });
     setQuestion("");
     setOptions(["", "", "", ""]);
     setCorrectIndex(0);
-    if (onQuestionAdded) onQuestionAdded();
+    onQuestionAdded();
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: 10 }}>
-      <input
-        type="text"
-        placeholder="Question"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        required
-      />
-      {options.map((opt, idx) => (
+    <form onSubmit={handleSubmit} style={{ marginTop: 12 }}>
+      <div>
         <input
-          key={idx}
-          type="text"
-          placeholder={`Option ${idx + 1}`}
-          value={opt}
-          onChange={(e) => handleOptionChange(e.target.value, idx)}
+          className="form-control mb-2"
+          placeholder="Question text"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
           required
         />
+      </div>
+      {options.map((opt, i) => (
+        <div key={i} className="input-group mb-2">
+          <span className="input-group-text">
+            <input
+              type="radio"
+              name="correct"
+              checked={correctIndex === i}
+              onChange={() => setCorrectIndex(i)}
+            />
+          </span>
+          <input
+            className="form-control"
+            placeholder={`Option ${i + 1}`}
+            value={opt}
+            onChange={(e) =>
+              setOptions((opts) => {
+                const copy = [...opts];
+                copy[i] = e.target.value;
+                return copy;
+              })
+            }
+            required
+          />
+        </div>
       ))}
-      <select
-        value={correctIndex}
-        onChange={(e) => setCorrectIndex(parseInt(e.target.value))}
-      >
-        <option value={0}>Option 1 is correct</option>
-        <option value={1}>Option 2 is correct</option>
-        <option value={2}>Option 3 is correct</option>
-        <option value={3}>Option 4 is correct</option>
-      </select>
-      <button type="submit">Add Question</button>
+      <button className="btn btn-sm btn-primary">Add Question</button>
     </form>
   );
 }

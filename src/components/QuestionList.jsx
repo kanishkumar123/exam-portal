@@ -1,38 +1,48 @@
 // src/components/QuestionList.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 
-export default function QuestionList({ examId, onDeleted }) {
+export default function QuestionList({ examId }) {
   const [questions, setQuestions] = useState([]);
 
-  const fetchQuestions = async () => {
-    const snap = await getDocs(collection(db, "exams", examId, "questions"));
+  const fetch = async () => {
+    const snap = await getDocs(collection(db, `exams/${examId}/questions`));
     setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   };
 
-  const handleDelete = async (qid) => {
-    await deleteDoc(doc(db, "exams", examId, "questions", qid));
-    fetchQuestions();
-    if (onDeleted) onDeleted();
-  };
-
   useEffect(() => {
-    fetchQuestions();
+    fetch();
   }, [examId]);
 
-  if (!questions.length) return <p>No questions yet.</p>;
+  const remove = async (id) => {
+    await deleteDoc(doc(db, `exams/${examId}/questions/${id}`));
+    fetch();
+  };
 
   return (
-    <ul style={{ marginLeft: 20 }}>
-      {questions.map((q, i) => (
-        <li key={q.id}>
-          <strong>Q{i + 1}:</strong> {q.question}{" "}
-          <button onClick={() => handleDelete(q.id)} style={{ marginLeft: 8 }}>
+    <div style={{ marginTop: 12 }}>
+      {questions.map((q) => (
+        <div key={q.id} className="border p-2 mb-2">
+          <strong>{q.question}</strong>
+          <ul>
+            {q.options.map((o, i) => (
+              <li
+                key={i}
+                style={{ fontWeight: i === q.correctIndex ? "bold" : "normal" }}
+              >
+                {o}
+              </li>
+            ))}
+          </ul>
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => remove(q.id)}
+          >
             Delete
           </button>
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }

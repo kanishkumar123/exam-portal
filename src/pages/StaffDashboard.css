@@ -1,0 +1,110 @@
+/* src/styles/StaffDashboard.css */
+
+.dashboard-container {
+  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.dashboard-header h2 {
+  margin: 0;
+}
+
+.logout-btn {
+  background-color: #d9534f;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background-color: #c9302c;
+}
+
+.exam-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.exam-form input,
+.exam-form button {
+  padding: 0.5rem;
+  font-size: 16px;
+}
+
+.exam-form button {
+  background-color: #0275d8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.exam-form button:hover {
+  background-color: #025aa5;
+}
+
+.exam-card {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background-color: #f9f9f9;
+  box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.exam-card h4 {
+  margin-top: 0;
+}
+
+.exam-card p {
+  margin: 5px 0;
+}
+
+.exam-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.exam-buttons button {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  background-color: #5bc0de;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.exam-buttons button:hover {
+  background-color: #31b0d5;
+}
+
+input[type="file"] {
+  margin-top: 0.5rem;
+}
+
+.logs {
+  margin-top: 0.5rem;
+  padding-left: 1rem;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.logs li {
+  list-style-type: disc;
+}

@@ -1,4 +1,3 @@
-// src/pages/AdminDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
 import {
@@ -21,42 +20,38 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Bulk import state
+  // bulk‐import state
   const [file, setFile] = useState(null);
-  const [importing, setImporting] = useState(false);
   const [importLog, setImportLog] = useState([]);
+  const [importing, setImporting] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  // Fetch all users from Firestore
+  // fetch all users
   const fetchUsers = async () => {
     setLoading(true);
     const snap = await getDocs(collection(db, "users"));
-    const data = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
-    setUsers(data);
+    setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
     setLoading(false);
   };
-
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  // Change user role
+  // change role
   const handleRoleChange = async (uid, newRole) => {
     await updateDoc(doc(db, "users", uid), { role: newRole });
     fetchUsers();
   };
-
-  // Delete Firestore user record
+  // delete user doc
   const handleDelete = async (uid) => {
-    if (!window.confirm("Delete this user record?")) return;
+    if (!window.confirm("Delete user?")) return;
     await deleteDoc(doc(db, "users", uid));
     fetchUsers();
   };
-
-  // Invite New Staff
+  // invite staff
   const createStaff = async () => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -66,73 +61,60 @@ export default function AdminDashboard() {
         role: "staff",
         createdAt: new Date(),
       });
-      alert(`Staff ${email} created!`);
       setEmail("");
       setPassword("");
       fetchUsers();
     } catch (err) {
-      alert("Error: " + err.message);
+      alert(err.message);
     }
   };
-
-  // Bulk Import Students from CSV (DD-MM-YYYY)
+  // bulk import students CSV (DD‑MM‑YYYY)
   const handleImport = () => {
     if (!file) return;
     setImporting(true);
     setImportLog([]);
-
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
+      complete: async ({ data }) => {
         const log = [];
-        for (let row of results.data) {
-          const appNum = String(
-            row.applicationNumber || row.application_number
-          ).trim();
-          const dobRaw = String(row.DOB || row.dob).trim();
-
-          // Parse DD-MM-YYYY or DD/MM/YYYY
+        for (let row of data) {
+          const app = String(row.applicationNumber).trim();
+          const dobRaw = String(row.DOB).trim();
           const parts = dobRaw.split(/[-/]/);
           if (parts.length !== 3) {
-            log.push(`❌ ${appNum}: invalid DOB format "${dobRaw}"`);
+            log.push(`❌ ${app}: invalid DOB "${dobRaw}"`);
             continue;
           }
-          let [day, month, year] = parts;
-          day = day.padStart(2, "0");
-          month = month.padStart(2, "0");
-          // Build ISO date and password
-          const isoDate = `${year}-${month}-${day}`; // YYYY-MM-DD
-          const pwd = `${year}${month}${day}`; // YYYYMMDD
-
-          const email = `${appNum}@yourdomain.local`;
+          let [day, month, year] = parts.map((p) => p.padStart(2, "0"));
+          const iso = `${year}-${month}-${day}`; // YYYY-MM-DD
+          const pwd = `${year}${month}${day}`; // password
+          const studEmail = `${app}@yourdomain.local`;
           try {
-            const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+            const cred = await createUserWithEmailAndPassword(
+              auth,
+              studEmail,
+              pwd
+            );
             await setDoc(doc(db, "users", cred.user.uid), {
               uid: cred.user.uid,
               role: "student",
-              applicationNumber: appNum,
-              dob: isoDate,
+              applicationNumber: app,
+              dob: iso,
               createdAt: new Date(),
             });
-            log.push(`✅ ${appNum}`);
+            log.push(`✅ ${app}`);
           } catch (err) {
-            log.push(`❌ ${appNum}: ${err.code}`);
+            log.push(`❌ ${app}: ${err.code}`);
           }
         }
         setImportLog(log);
         setImporting(false);
         fetchUsers();
       },
-      error: (err) => {
-        console.error("CSV parse error:", err);
-        setImportLog([`❌ CSV parse error: ${err.message}`]);
-        setImporting(false);
-      },
     });
   };
-
-  // Logout
+  // logout
   const handleLogout = async () => {
     await signOut(auth);
     navigate("/login");
@@ -147,7 +129,7 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Invite New Staff */}
+      {/* invite staff */}
       <div className="mb-5">
         <h4>Invite New Staff</h4>
         <div className="d-flex gap-2">
@@ -161,7 +143,7 @@ export default function AdminDashboard() {
           <input
             type="password"
             className="form-control"
-            placeholder="Temporary Password"
+            placeholder="Temp Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -171,9 +153,9 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Bulk Import Students */}
+      {/* bulk import students */}
       <div className="mb-5">
-        <h4>Import Students from CSV</h4>
+        <h4>Import Students CSV</h4>
         <input
           type="file"
           accept=".csv"
@@ -184,30 +166,27 @@ export default function AdminDashboard() {
           onClick={handleImport}
           disabled={!file || importing}
         >
-          {importing ? "Importing..." : "Start Import"}
+          {importing ? "Importing…" : "Start Import"}
         </button>
         {importLog.length > 0 && (
-          <div className="mt-3">
-            <h6>Import Results:</h6>
-            <ul>
-              {importLog.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
-          </div>
+          <ul className="mt-3">
+            {importLog.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* User Management Table */}
+      {/* user table */}
       {loading ? (
-        <p>Loading users...</p>
+        <p>Loading users…</p>
       ) : (
-        <table className="table table-striped">
+        <table className="table">
           <thead>
             <tr>
               <th>UID</th>
               <th>Email</th>
-              <th>Name/App#</th>
+              <th>App#/Name</th>
               <th>Role</th>
               <th>Actions</th>
             </tr>
