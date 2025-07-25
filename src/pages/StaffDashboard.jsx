@@ -26,6 +26,29 @@ export default function StaffDashboard() {
   const [csvImporting, setCsvImporting] = useState(false);
   const navigate = useNavigate();
 
+  const formatDate = (date) => {
+    if (!date) return "";
+    // If Firestore Timestamp, convert to JS Date
+    if (typeof date.toDate === "function") {
+      date = date.toDate();
+    }
+    const d = new Date(date);
+
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    const strTime = `${hours}:${minutes} ${ampm}`;
+
+    return `${day}/${month}/${year} - ${strTime}`;
+  };
+
   // ✅ Only allow access if role is 'admin'
   useEffect(() => {
     if (!currentUser || userData?.role !== "admin") {
@@ -77,6 +100,11 @@ export default function StaffDashboard() {
   };
 
   const handleDelete = async (id) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this exam?"
+    );
+    if (!confirmed) return; // exit if user clicks 'Cancel'
+
     await deleteDoc(doc(db, "exams", id));
     setExams((prev) => prev.filter((e) => e.id !== id));
   };
@@ -205,16 +233,12 @@ export default function StaffDashboard() {
         <div key={exam.id} className="exam-card">
           <h4>{exam.title}</h4>
           <p>
-            {new Date(
-              exam.startTime.seconds
-                ? exam.startTime.seconds * 1000
-                : exam.startTime
-            ).toLocaleString()}{" "}
-            –{" "}
-            {new Date(
-              exam.endTime.seconds ? exam.endTime.seconds * 1000 : exam.endTime
-            ).toLocaleString()}
+            {formatDate(
+              exam.startTime.seconds ? exam.startTime : exam.startTime
+            )}{" "}
+            to {formatDate(exam.endTime.seconds ? exam.endTime : exam.endTime)}
           </p>
+
           <p>Duration: {exam.duration} mins</p>
 
           <div className="exam-buttons">
