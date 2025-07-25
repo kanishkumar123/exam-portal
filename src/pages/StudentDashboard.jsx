@@ -18,6 +18,29 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const formatDate = (date) => {
+    if (!date) return "";
+    // If Firestore Timestamp, convert to JS Date
+    if (typeof date.toDate === "function") {
+      date = date.toDate();
+    }
+    const d = new Date(date);
+
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    const strTime = `${hours}:${minutes} ${ampm}`;
+
+    return `${day}/${month}/${year} - ${strTime}`;
+  };
+
   useEffect(() => {
     if (!currentUser) return;
     const loadExams = async () => {
@@ -94,56 +117,60 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Available Exams</h2>
-      <button onClick={handleLogout}>Logout</button>
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2>Available Exams</h2>
+        <button className="logout-btn" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
 
-      {loading && <p>Loading exams...</p>}
+      {loading && <p className="status">Loading exams…</p>}
 
       {!loading && exams.length === 0 && (
-        <p>No active exams available at this time.</p>
+        <p className="empty">No active exams available at this time.</p>
       )}
 
-      {!loading &&
-        exams.map((exam) => (
-          <div
-            key={exam.id}
-            style={{ border: "1px solid #ccc", padding: 10, margin: 10 }}
-          >
-            <h4>{exam.title}</h4>
-            <p>
-              Starts: {exam.startTime.toLocaleString()}
-              <br />
-              Ends: {exam.endTime.toLocaleString()}
-            </p>
-
-            {exam.status === "not_started" && (
-              <p style={{ color: "blue" }}>Exam not started yet</p>
-            )}
-
-            {exam.status === "expired" && (
-              <p style={{ color: "red" }}>Time for this exam has expired</p>
-            )}
-
-            {exam.status === "submitted" && (
-              <p style={{ color: "green" }}>
-                Exam submitted on{" "}
-                {exam.submissionTime
-                  ? new Date(
-                      exam.submissionTime.seconds * 1000
-                    ).toLocaleString()
-                  : "N/A"}
-              </p>
-            )}
-
-            <button
-              disabled={exam.status !== "active"}
-              onClick={() => navigate(`/exam/${exam.id}`)}
-            >
-              {exam.status === "active" ? "Start Exam" : "Unavailable"}
-            </button>
-          </div>
-        ))}
+      <ul className="exam-list">
+        {!loading &&
+          exams.map((exam) => (
+            <li key={exam.id} className="exam-item">
+              <div>
+                <div className="course-title">{exam.title}</div>
+                <div>
+                  Starts: {formatDate(exam.startTime)}
+                  <br />
+                  Ends: {formatDate(exam.endTime)}
+                </div>
+                {exam.status === "not_started" && (
+                  <p style={{ color: "blue", marginTop: "0.5rem" }}>
+                    Exam not started yet
+                  </p>
+                )}
+                {exam.status === "expired" && (
+                  <p style={{ color: "red", marginTop: "0.5rem" }}>
+                    Time for this exam has expired
+                  </p>
+                )}
+                {exam.status === "submitted" && (
+                  <p style={{ color: "green", marginTop: "0.5rem" }}>
+                    Exam submitted on{" "}
+                    {exam.submissionTime
+                      ? formatDate(exam.submissionTime)
+                      : "N/A"}
+                  </p>
+                )}
+              </div>
+              <button
+                className="start-btn"
+                disabled={exam.status !== "active"}
+                onClick={() => navigate(`/exam/${exam.id}`)}
+              >
+                {exam.status === "active" ? "Start Exam" : "Unavailable"}
+              </button>
+            </li>
+          ))}
+      </ul>
     </div>
   );
 }
