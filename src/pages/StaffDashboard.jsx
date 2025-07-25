@@ -11,7 +11,11 @@ import {
   where,
   setDoc,
 } from "firebase/firestore";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
 import Papa from "papaparse";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -115,6 +119,19 @@ export default function StaffDashboard() {
     setCsvImporting(true);
     setCsvLogs((l) => ({ ...l, [examId]: [] }));
 
+    // Save admin credentials for re-login:
+    const adminEmail = currentUser.email;
+
+    // Prompt admin password once before import
+    const adminPassword = prompt(
+      "Enter your admin password to continue import:"
+    );
+    if (!adminPassword) {
+      alert("Import cancelled - admin password required");
+      setCsvImporting(false);
+      return;
+    }
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
@@ -140,8 +157,8 @@ export default function StaffDashboard() {
           const pwd = `${year}${month}${day}`;
           const studEmail = `${app}@yourdomain.local`;
 
-          let uid = null;
           try {
+            // Check if user exists in Firestore
             const usersSnap = await getDocs(
               query(
                 collection(db, "users"),
@@ -149,10 +166,25 @@ export default function StaffDashboard() {
               )
             );
 
+            let uid = null;
+
             if (!usersSnap.empty) {
               uid = usersSnap.docs[0].id;
-              logs.push(`ℹ️ [${app}] Student exists`);
+              logs.push(`ℹ️ [${app}] Student exists in Firestore`);
+
+              await setDoc(
+                doc(db, "users", uid),
+                {
+                  uid,
+                  email: studEmail,
+                  role: "student",
+                  applicationNumber: app,
+                  dob: iso,
+                },
+                { merge: true }
+              );
             } else {
+              // Create user in Firebase Auth
               const cred = await createUserWithEmailAndPassword(
                 auth,
                 studEmail,
@@ -160,6 +192,11 @@ export default function StaffDashboard() {
               );
               uid = cred.user.uid;
 
+              // Firebase auto sign-in switches to this user, so:
+              await signOut(auth);
+              await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+
+              // Now back as admin, create Firestore user doc
               await setDoc(doc(db, "users", uid), {
                 uid,
                 email: studEmail,
@@ -172,8 +209,8 @@ export default function StaffDashboard() {
               logs.push(`✅ [${app}] Student created`);
             }
 
-            const regRef = doc(db, "registrations", `${examId}_${app}`);
-            await setDoc(regRef, {
+            // Create/update registration
+            await setDoc(doc(db, "registrations", `${examId}_${app}`), {
               examId,
               studentId: uid,
               studentAppNo: app,
@@ -193,7 +230,7 @@ export default function StaffDashboard() {
         }));
         setCsvImporting(false);
         setCsvTarget(null);
-        alert("CSV import completed.");
+        alert("CSV import completed. Check logs for details.");
       },
     });
   };
