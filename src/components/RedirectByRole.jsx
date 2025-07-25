@@ -15,8 +15,6 @@ export default function RedirectByRole() {
   switch (userData.role) {
     case "student":
       return <Navigate to="/student" replace />;
-    case "staff":
-      return <Navigate to="/staff" replace />;
     case "admin":
       return <Navigate to="/admin" replace />;
     default:

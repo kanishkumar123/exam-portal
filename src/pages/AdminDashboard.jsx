@@ -10,7 +10,7 @@ import {
 } from "firebase/firestore";
 import {
   createUserWithEmailAndPassword,
-  updateProfile,
+  signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import Papa from "papaparse";
@@ -20,55 +20,82 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // bulk‐import state
   const [file, setFile] = useState(null);
   const [importLog, setImportLog] = useState([]);
   const [importing, setImporting] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // ⬇️ Store admin credentials securely to re-login after staff creation
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+
   const navigate = useNavigate();
 
-  // fetch all users
   const fetchUsers = async () => {
     setLoading(true);
     const snap = await getDocs(collection(db, "users"));
     setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
     setLoading(false);
   };
+
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  // change role
   const handleRoleChange = async (uid, newRole) => {
     await updateDoc(doc(db, "users", uid), { role: newRole });
     fetchUsers();
   };
-  // delete user doc
+
   const handleDelete = async (uid) => {
     if (!window.confirm("Delete user?")) return;
     await deleteDoc(doc(db, "users", uid));
     fetchUsers();
   };
-  // invite staff
+
   const createStaff = async () => {
+    if (!adminEmail || !adminPassword) {
+      alert("Please enter your admin email and password.");
+      return;
+    }
+
     try {
+      // Step 1: create staff (this switches auth to new staff)
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: "Staff" });
-      await setDoc(doc(db, "users", cred.user.uid), {
-        email: cred.user.email,
+      const staffUid = cred.user.uid;
+
+      // Step 2: Sign out of new staff
+      await signOut(auth);
+
+      // Step 3: Re-authenticate as admin
+      await signInWithEmailAndPassword(
+        auth,
+        adminEmail,
+        adminPassword
+      );
+
+      // Step 4: Now back in admin context, add Firestore staff user doc
+      await setDoc(doc(db, "users", staffUid), {
+        uid: staffUid,
+        email: email.trim(),
         role: "staff",
         createdAt: new Date(),
       });
+
+      alert(`Staff ${email} created successfully.`);
+
+      // Cleanup
       setEmail("");
       setPassword("");
       fetchUsers();
     } catch (err) {
-      alert(err.message);
+      console.error("Create staff failed:", err);
+      alert(err.message || "Failed to create staff user. Check credentials and try again.");
     }
   };
-  // bulk import students CSV (DD‑MM‑YYYY)
+
   const handleImport = () => {
     if (!file) return;
     setImporting(true);
@@ -87,8 +114,8 @@ export default function AdminDashboard() {
             continue;
           }
           let [day, month, year] = parts.map((p) => p.padStart(2, "0"));
-          const iso = `${year}-${month}-${day}`; // YYYY-MM-DD
-          const pwd = `${year}${month}${day}`; // password
+          const iso = `${year}-${month}-${day}`;
+          const pwd = `${year}${month}${day}`;
           const studEmail = `${app}@yourdomain.local`;
           try {
             const cred = await createUserWithEmailAndPassword(
@@ -114,7 +141,7 @@ export default function AdminDashboard() {
       },
     });
   };
-  // logout
+
   const handleLogout = async () => {
     await signOut(auth);
     navigate("/login");
@@ -129,10 +156,32 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* invite staff */}
+      {/* ✅ Admin login credentials section (used for safe re-login) */}
+      <div className="mb-4">
+        <h4>Admin Credentials (for re-login after staff creation)</h4>
+        <div className="d-flex gap-2 flex-wrap">
+          <input
+            type="email"
+            className="form-control"
+            placeholder="Your Admin Email"
+            value={adminEmail}
+            onChange={(e) => setAdminEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            className="form-control"
+            placeholder="Admin Password"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            required
+          />
+        </div>
+      </div>
+
       <div className="mb-5">
         <h4>Invite New Staff</h4>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap">
           <input
             type="email"
             className="form-control"
@@ -143,7 +192,7 @@ export default function AdminDashboard() {
           <input
             type="password"
             className="form-control"
-            placeholder="Temp Password"
+            placeholder="Temp Password for staff"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -153,14 +202,9 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* bulk import students */}
       <div className="mb-5">
         <h4>Import Students CSV</h4>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => setFile(e.target.files[0])}
-        />
+        <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files[0])} />
         <button
           className="btn btn-secondary ms-2"
           onClick={handleImport}
@@ -177,7 +221,6 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* user table */}
       {loading ? (
         <p>Loading users…</p>
       ) : (

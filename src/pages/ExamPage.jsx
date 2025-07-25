@@ -1,4 +1,3 @@
-// src/pages/ExamPage.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -20,19 +19,26 @@ export default function ExamPage() {
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState(0);
 
+  // New states for submission tracking
+  const [submitted, setSubmitted] = useState(false);
+  const [submissionBlocked, setSubmissionBlocked] = useState(false);
+
   const navigate = useNavigate();
 
+  // Fetch exam data, questions, and registration status
   useEffect(() => {
     const fetchExamData = async () => {
       try {
         // Get exam metadata including duration
         const examDoc = await getDoc(doc(db, "exams", examId));
-
-        if (examDoc.exists()) {
-          const data = examDoc.data();
-
-          setTimeLeft(data.duration * 60); // convert minutes to seconds
+        if (!examDoc.exists()) {
+          alert("Exam not found!");
+          navigate("/student");
+          return;
         }
+
+        const data = examDoc.data();
+        setTimeLeft(data.duration * 60); // minutes to seconds
 
         // Get questions
         const qSnap = await getDocs(
@@ -40,41 +46,105 @@ export default function ExamPage() {
         );
         const qList = qSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         setQuestions(qList);
+
+        // Fetch registration to check submission
+        const user = auth.currentUser;
+        if (!user) throw new Error("No logged in user");
+
+        // First try by studentId (UID)
+        const regSnapByID = await getDocs(
+          query(
+            collection(db, "registrations"),
+            where("examId", "==", examId),
+            where("studentId", "==", user.uid)
+          )
+        );
+
+        let regDoc = null;
+        if (!regSnapByID.empty) {
+          regDoc = regSnapByID.docs[0];
+        } else {
+          // Fallback by studentAppNo
+          const emailPrefix = user.email.split("@")[0];
+          const regSnapByApp = await getDocs(
+            query(
+              collection(db, "registrations"),
+              where("examId", "==", examId),
+              where("studentAppNo", "==", emailPrefix)
+            )
+          );
+          if (!regSnapByApp.empty) {
+            regDoc = regSnapByApp.docs[0];
+          }
+        }
+
+        if (!regDoc) {
+          alert("You are not registered for this exam.");
+          navigate("/student");
+          return;
+        }
+
+        // Check if already submitted
+        if (regDoc.data().submittedAt) {
+          setSubmitted(true);
+          setSubmissionBlocked(true);
+        }
+
+        // Check if exam time expired
+        const now = new Date();
+        const examEndTime = data.endTime.toDate
+          ? data.endTime.toDate()
+          : new Date(data.endTime);
+
+        if (now > examEndTime && !regDoc.data().submittedAt) {
+          setSubmissionBlocked(true);
+          alert("Time for this exam has expired. You cannot submit.");
+        }
       } catch (error) {
-        console.error("Error fetching exam/questions:", error);
+        console.error("Error fetching exam data or registration:", error);
+        alert("Error loading exam data.");
+        navigate("/student");
       } finally {
         setLoading(false);
       }
     };
 
     fetchExamData();
-  }, [examId]);
+  }, [examId, navigate]);
 
   // Timer countdown logic
   useEffect(() => {
     if (timeLeft <= 0) {
-      if (!loading) {
-        handleSubmit(); // Auto-submit on timeout
+      // Auto-submit if not already submitted and not blocked
+      if (!loading && !submitted && !submissionBlocked) {
+        handleSubmit();
       }
       return;
     }
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
-
+    const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, loading]);
+  }, [timeLeft, loading, submitted, submissionBlocked]);
 
   const handleOptionChange = (questionId, selectedIndex) => {
     setAnswers((prev) => ({ ...prev, [questionId]: selectedIndex }));
   };
 
   const handleSubmit = async () => {
+    if (submitted || submissionBlocked) {
+      alert("You have already submitted this exam or submission is blocked.");
+      return;
+    }
+
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      alert("No logged in user");
+      return;
+    }
 
     try {
+      console.log("Submitting exam for user:", user.uid);
+      console.log("Answers:", answers);
+
       // Calculate score
       let score = 0;
       questions.forEach((q) => {
@@ -86,7 +156,7 @@ export default function ExamPage() {
 
       let regDoc = null;
 
-      // 1st try: search by studentId field (best if registration has it)
+      // First try studentId
       const regSnapByID = await getDocs(
         query(
           collection(db, "registrations"),
@@ -97,7 +167,7 @@ export default function ExamPage() {
       if (!regSnapByID.empty) {
         regDoc = regSnapByID.docs[0];
       } else {
-        // 2nd fallback: search by studentAppNo using email prefix
+        // Fallback by app number
         const emailPrefix = user.email.split("@")[0];
         const regSnapByApp = await getDocs(
           query(
@@ -111,20 +181,30 @@ export default function ExamPage() {
         }
       }
 
-      if (!regDoc) throw new Error("Registration not found");
+      if (!regDoc) {
+        alert("Registration not found.");
+        return;
+      }
 
-      // Update registration with answers and score
+      if (regDoc.data().submittedAt) {
+        setSubmitted(true);
+        alert("You have already submitted this exam.");
+        return;
+      }
+
+      // Update registration with answers, score and submission time
       await updateDoc(doc(db, "registrations", regDoc.id), {
         answers,
         score,
         submittedAt: new Date(),
       });
 
+      setSubmitted(true);
       alert("Exam submitted successfully!");
       navigate("/student");
     } catch (err) {
       console.error("Submission failed:", err);
-      alert("Error submitting exam");
+      alert("Error submitting exam: " + err.message);
     }
   };
 
@@ -143,6 +223,20 @@ export default function ExamPage() {
         <h4 className="text-danger">Time Left: {formatTime(timeLeft)}</h4>
       </div>
 
+      {submitted && (
+        <div
+          style={{
+            backgroundColor: "#d4edda",
+            padding: "10px",
+            marginBottom: "15px",
+            borderRadius: "5px",
+            color: "#155724",
+          }}
+        >
+          You have already submitted this exam. Thank you!
+        </div>
+      )}
+
       {questions.map((q, index) => (
         <div key={q.id} className="mb-4">
           <h5>
@@ -157,6 +251,7 @@ export default function ExamPage() {
                   value={i}
                   checked={answers[q.id] === i}
                   onChange={() => handleOptionChange(q.id, i)}
+                  disabled={submitted || submissionBlocked}
                 />{" "}
                 {opt}
               </label>
@@ -165,7 +260,11 @@ export default function ExamPage() {
         </div>
       ))}
 
-      <button className="btn btn-primary mt-3" onClick={handleSubmit}>
+      <button
+        className="btn btn-primary mt-3"
+        onClick={handleSubmit}
+        disabled={submitted || submissionBlocked}
+      >
         Submit Exam
       </button>
     </div>

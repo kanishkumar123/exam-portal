@@ -1,18 +1,18 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import StudentDashboard from "./pages/StudentDashboard";
-import StaffDashboard from "./pages/StaffDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminDashboard from "./pages/StaffDashboard"; // using as AdminDashboard
 import ExamPage from "./pages/ExamPage";
-import ManageQuestionsPage from "./pages/ManageQuestionsPage"; // ✅ import new page
+import ManageQuestionsPage from "./pages/ManageQuestionsPage";
+import ResultsPage from "./pages/ResultsPage"; // if implemented
 
 import RedirectByRole from "./components/RedirectByRole";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         {/* Landing route redirects based on role */}
         <Route path="/" element={<RedirectByRole />} />
@@ -27,23 +27,18 @@ export default function App() {
           <Route path="/exam/:examId" element={<ExamPage />} />
         </Route>
 
-        {/* Protected Staff routes */}
-        <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
-          <Route path="/staff" element={<StaffDashboard />} />
-          <Route
-            path="/staff/exam/:examId/questions"
-            element={<ManageQuestionsPage />}
-          />
-        </Route>
-
         {/* Protected Admin routes */}
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route
+            path="/admin/exam/:examId/questions"
+            element={<ManageQuestionsPage />}
+          />
+          <Route path="/admin/results/:examId" element={<ResultsPage />} />
         </Route>
 
-        {/* Catch-all fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

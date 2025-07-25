@@ -15,24 +15,24 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import Papa from "papaparse";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import "./StaffDashboard.css"; // ✅ Import your custom styles
+import "./StaffDashboard.css";
 
 export default function StaffDashboard() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, userData } = useAuth();
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [csvTarget, setCsvTarget] = useState(null); // current examId being imported
+  const [csvTarget, setCsvTarget] = useState(null);
   const [csvLogs, setCsvLogs] = useState({});
   const [csvImporting, setCsvImporting] = useState(false);
-
   const navigate = useNavigate();
 
-  // Fetch exams created by current staff
+  // ✅ Only allow access if role is 'admin'
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || userData?.role !== "admin") {
       navigate("/login");
       return;
     }
+
     const fetchExams = async () => {
       setLoading(true);
       const q = query(
@@ -43,12 +43,14 @@ export default function StaffDashboard() {
       setExams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     };
+
     fetchExams();
-  }, [currentUser, navigate]);
+  }, [currentUser, userData, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { title, startTime, endTime, duration } = e.target.elements;
+
     const payload = {
       title: title.value,
       startTime: new Date(startTime.value),
@@ -56,6 +58,7 @@ export default function StaffDashboard() {
       duration: Number(duration.value),
       createdBy: currentUser.uid,
     };
+
     const form = e.target;
     if (form.dataset.editId) {
       await updateDoc(doc(db, "exams", form.dataset.editId), payload);
@@ -65,14 +68,12 @@ export default function StaffDashboard() {
     }
     form.reset();
 
-    setLoading(true);
     const q = query(
       collection(db, "exams"),
       where("createdBy", "==", currentUser.uid)
     );
     const snap = await getDocs(q);
     setExams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    setLoading(false);
   };
 
   const handleDelete = async (id) => {
@@ -80,6 +81,7 @@ export default function StaffDashboard() {
     setExams((prev) => prev.filter((e) => e.id !== id));
   };
 
+  // ✅ Import students, create Auth + Firestore doc + registration
   const handleStudentCsv = (file, examId) => {
     if (!file) return;
     setCsvImporting(true);
@@ -123,30 +125,23 @@ export default function StaffDashboard() {
               uid = usersSnap.docs[0].id;
               logs.push(`ℹ️ [${app}] Student exists`);
             } else {
-              try {
-                const cred = await createUserWithEmailAndPassword(
-                  auth,
-                  studEmail,
-                  pwd
-                );
-                uid = cred.user.uid;
-                await setDoc(doc(db, "users", uid), {
-                  uid,
-                  email: studEmail,
-                  role: "student",
-                  applicationNumber: app,
-                  dob: iso,
-                  createdAt: new Date(),
-                });
-                logs.push(`✅ [${app}] Student created`);
-              } catch (createErr) {
-                logs.push(
-                  `❌ [${app}] User create error: ${
-                    createErr.message || createErr.code
-                  }`
-                );
-                continue;
-              }
+              const cred = await createUserWithEmailAndPassword(
+                auth,
+                studEmail,
+                pwd
+              );
+              uid = cred.user.uid;
+
+              await setDoc(doc(db, "users", uid), {
+                uid,
+                email: studEmail,
+                role: "student",
+                applicationNumber: app,
+                dob: iso,
+                createdAt: new Date(),
+              });
+
+              logs.push(`✅ [${app}] Student created`);
             }
 
             const regRef = doc(db, "registrations", `${examId}_${app}`);
@@ -191,7 +186,6 @@ export default function StaffDashboard() {
         </button>
       </div>
 
-      {/* Exam form */}
       <form className="exam-form" onSubmit={handleSubmit}>
         <input name="title" placeholder="Title" required />
         <input name="startTime" type="datetime-local" required />
@@ -253,17 +247,16 @@ export default function StaffDashboard() {
             >
               {csvTarget === exam.id ? "Cancel CSV" : "Import Students"}
             </button>
-            <button onClick={() => navigate(`/staff/results/${exam.id}`)}>
+            <button onClick={() => navigate(`/admin/results/${exam.id}`)}>
               View Submissions
             </button>
             <button
-              onClick={() => navigate(`/staff/exam/${exam.id}/questions`)}
+              onClick={() => navigate(`/admin/exam/${exam.id}/questions`)}
             >
               Manage Questions
             </button>
           </div>
 
-          {/* 📥 CSV File input */}
           {csvTarget === exam.id && (
             <div>
               <input
@@ -275,7 +268,6 @@ export default function StaffDashboard() {
             </div>
           )}
 
-          {/* 📜 CSV Import logs */}
           {csvLogs[exam.id] && csvLogs[exam.id].length > 0 && (
             <ul className="logs">
               {csvLogs[exam.id].map((msg, i) => (
